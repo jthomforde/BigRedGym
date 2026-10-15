@@ -19,6 +19,9 @@ class Go2Trot(LeggedRobot):
         self.phase = torch.zeros(
             self.num_envs, 1, dtype=torch.float, device=self.device
         )
+        self.height_command = torch.zeros(
+            self.num_envs, 1, dtype=torch.float, device=self.device
+        )
         self.phase_obs = torch.zeros(
             self.num_envs, 2, dtype=torch.float, device=self.device
         )
@@ -130,6 +133,28 @@ class Go2Trot(LeggedRobot):
         )
         masked_update(self.commands[:, 0], forward, command_mask)
 
+        height_levels = torch.tensor(
+            self.command_ranges["base_height"], device=self.device
+        )
+
+        level_indices = torch.randint(
+            len(height_levels),
+            (self.num_envs, 1),
+            device=self.device,
+        )
+
+        noise = (
+            torch.randn(self.num_envs, 1, device=self.device)
+            * self.cfg.commands.height_noise_std
+        )
+
+        heights = torch.clamp(
+            height_levels[level_indices] + noise,
+            min=height_levels.min(),
+            max=height_levels.max(),
+        )
+        masked_update(self.height_command, heights, command_mask)
+
         if 0 in self.cfg.commands.ranges.lin_vel_x:
             # Include forward-only, rotation-only, and stopped examples.
             drop = command_mask.unsqueeze(1) & (
@@ -195,6 +220,11 @@ class Go2Trot(LeggedRobot):
             max=1.0,
         )
         return torch.relu(phase).amax(dim=1) * paired_support
+
+    def _reward_tracking_base_height(self):
+        error = (self.base_height - self.height_command).flatten()
+        width = self.cfg.reward_settings.base_height_tracking_width
+        return torch.exp(-torch.square(error / width))
 
     def _reward_swing_contact(self):
         """Penalize load carried by feet during their scheduled swing phase."""
