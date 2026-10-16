@@ -129,16 +129,34 @@ def setup(args):
     runner.switch_to_eval()
     return env, runner
 
+HEIGHT_LOG_PATH = "logs/height_tracking.csv"
+
+def open_height_log(env):
+    """Line-buffered CSV of env 0's commanded vs. actual base height, or None."""
+    if not hasattr(env, "height_command"):
+        return None
+    height_log = open(HEIGHT_LOG_PATH, "w", buffering=1)
+    height_log.write("time_s,commanded_m,actual_m\n")
+    return height_log
+
+
 
 def play(env, runner):
     n_steps = 10 * int(env.max_episode_length)
-    for _ in range(n_steps):
+    height_log = open_height_log(env)
+    for step in range(n_steps):
         runner.set_actions(
             runner.actor_cfg["actions"],
             runner.get_inference_actions(),
             runner.actor_cfg["disable_actions"],
         )
         env.step()
+        if height_log is not None:                     # ← add: one row per step
+            height_log.write(
+                f"{step * env.dt:.2f},"
+                f"{env.height_command[0, 0].item():.4f},"
+                f"{env.base_height[0, 0].item():.4f}\n"
+            )
         env.check_exit()
 
 

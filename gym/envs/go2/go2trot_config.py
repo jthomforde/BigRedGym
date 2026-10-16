@@ -60,9 +60,11 @@ class Go2TrotCfg(Go2Cfg):
 
     class commands(Go2Cfg.commands):
         var = 1.0
+        height_noise_std = 0.035
 
         class ranges(Go2Cfg.commands.ranges):
             lin_vel_x = [-1.0, 0.0, 1.0, 3.0]
+            base_height = [0.17, 0.275, 0.38]
 
     class push_robots(Go2Cfg.push_robots):
         toggle = True
@@ -91,7 +93,9 @@ class Go2TrotCfg(Go2Cfg):
         disable_motors = False
 
     class reward_settings(Go2Cfg.reward_settings):
+        base_height_tracking_width = 0.10
         base_height_target = Go2Cfg.reward_settings.base_height_target
+
 
     class scaling(Go2Cfg.scaling):
         # Canonical RobotLayout order is FL, FR, RL, RR, with
@@ -101,6 +105,7 @@ class Go2TrotCfg(Go2Cfg):
         dof_pos_obs = dof_pos
         dof_pos_target = [0.5 * x for x in dof_pos]
         tau_ff = 4 * [23.7, 23.7, 45.43]
+        height_command = 0.3
 
 
 class Go2TrotRunnerCfg(Go2RunnerCfg):
@@ -117,6 +122,7 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
             "dof_pos_target",
             "phase_obs",
             "phase_frequency",
+            "height_command",
         ]
         normalize_obs = False
         smooth_exploration = False
@@ -149,6 +155,7 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
             "dof_pos_target",
             "phase_obs",
             "phase_frequency",
+            "height_command",
         ]
         normalize_obs = False
 
@@ -156,6 +163,7 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
             class weights:
                 tracking_lin_vel = 4.0
                 tracking_ang_vel = 2.0
+                tracking_base_height = 4.0
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.01
                 orientation = 1.0
@@ -165,7 +173,7 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                min_base_height = 0.5
+                min_base_height = 0.0
                 action_rate = 0.25
                 action_rate2 = 0.025
                 trot_support = 0.625
