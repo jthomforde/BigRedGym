@@ -31,6 +31,12 @@ class Go2BoxStepCfg(Go2TrotCfg):
         # go2trot's tracking_sigma = 0.25 (an effective width of 0.5 m/s).
         velocity_tracking_width = 0.3
 
+    class asset(Go2TrotCfg.asset):
+        # Head_upper and Head_lower are separate bodies from base on the Go2.
+        # Run Nov10_21-15-58_ learned to rest its face on the floor at 40 deg
+        # pitch because only base contact ended an episode.
+        terminate_after_contacts_on = ["base", "Head"]
+
     class push_robots(Go2TrotCfg.push_robots):
         toggle = False  # no pushes until the box works
 
@@ -94,7 +100,9 @@ class Go2BoxStepRunnerCfg(Go2TrotRunnerCfg):
                 tracking_ang_vel = 2.0  # yaw rate target is zero
                 lin_vel_z = 0.25  # go2trot has 0.0; the plan keeps this term
                 ang_vel_xy = 0.01
-                orientation = 1.0
+                # Raised from go2trot's 1.0: at 1.0, 40 deg of pitch cost only
+                # 0.8 and the policy traded it for velocity reward.
+                orientation = 3.0
                 torques = 5.0e-6
                 # Hold the body at the standing height (go2trot has 0.0 here and
                 # uses the height command instead; 1.5 is Go2RunnerCfg's value).
