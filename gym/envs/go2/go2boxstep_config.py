@@ -36,6 +36,10 @@ class Go2BoxStepCfg(Go2TrotCfg):
         # Provisional: width of the exp(-|Δx - d·p·e|^2 / width^2) per-beat
         # displacement reward [m]. Half a 0.27 m step short scores about 0.16.
         displacement_tracking_width = 0.10
+        # Provisional: width of the exp(-err^2 / width^2) stance-foot placement
+        # reward [m]. Run Nov13_15-31-54_ had a 16 cm median error (scores 0.26
+        # mean); the reference alone has 9 cm from joint lag (scores 0.42).
+        foot_placement_width = 0.10
 
     class asset(Go2TrotCfg.asset):
         # Head_upper and Head_lower are separate bodies from base on the Go2.
@@ -130,6 +134,9 @@ class Go2BoxStepRunnerCfg(Go2TrotRunnerCfg):
                 # Body reaches each corner (run Nov13_02-32-57_ covered 19-67 %
                 # of each step). Provisional.
                 tracking_beat_displacement = 4.0
+                # Stance feet stay under their hips as the reference places them
+                # (back-right foot dragged 20 cm behind in Nov13_15-31-54_).
+                stance_foot_placement = 2.0
                 stance_foot_slip = 0.5
                 extra_touchdowns = 0.5
                 # Raised from 0.1: run Nov13_01-51-32_ overrode the reference by

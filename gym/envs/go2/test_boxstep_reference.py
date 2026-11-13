@@ -14,16 +14,8 @@ SWING_CLEARANCE_M = 0.06
 REACH_LIMIT_M = 2.0 * reference.LINK_LENGTH_M * math.cos(0.83776 / 2.0)
 
 
-def compute_foot_positions(joint_angles):
-    """Forward kinematics, MATH 3.2: joint angles (N, 12) -> feet (N, 4, 3)."""
-    hip, thigh, calf = joint_angles.reshape(-1, 4, 3).unbind(dim=2)
-    link = reference.LINK_LENGTH_M
-    foot_x = -link * (torch.sin(thigh) + torch.sin(thigh + calf))
-    plane_z = -link * (torch.cos(thigh) + torch.cos(thigh + calf))
-    plane_y = reference.LEG_SIDE_SIGN * reference.HIP_OFFSET_M
-    foot_y = plane_y * torch.cos(hip) - plane_z * torch.sin(hip)
-    foot_z = plane_y * torch.sin(hip) + plane_z * torch.cos(hip)
-    return torch.stack((foot_x, foot_y, foot_z), dim=2)
+# Forward kinematics (MATH 3.2), now shared with the task's foot placement reward.
+compute_foot_positions = reference.compute_foot_positions
 
 
 def sample_whole_box(beat_period_s, samples_per_beat=2000):

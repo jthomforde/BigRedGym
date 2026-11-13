@@ -46,6 +46,10 @@ class Go2BoxStep(Go2Trot):
         self.beat_start_position = create_column(2)
         self.beat_start_yaw = create_column()
         self.beat_displacement = create_column(2)
+        # Reference foot targets, each in its own hip frame (N, 4, 3).
+        self.reference_foot_positions = torch.zeros(
+            self.num_envs, 4, 3, dtype=torch.float, device=self.device
+        )
 
         neutral_feet = reference.compute_neutral_foot_positions(
             settings.standing_height_m, self.device
@@ -79,13 +83,16 @@ class Go2BoxStep(Go2Trot):
         settings = self.cfg.boxstep
         beat_index, beat_fraction, swing_fraction = self._compute_beat_state()
         step_size = self.step_size.squeeze(1)
-        self.gait_reference[:] = reference.compute_reference_joint_angles(
+        self.reference_foot_positions[:] = reference.compute_reference_foot_positions(
             self.beat_time.squeeze(1),
             self.beat_period.squeeze(1),
             settings.swing_time_s,
             step_size,
             settings.standing_height_m,
             settings.swing_clearance_m,
+        )
+        self.gait_reference[:] = reference.solve_leg_joint_angles(
+            self.reference_foot_positions
         )
         self.scheduled_stance[:] = reference.compute_scheduled_stance(
             beat_index, beat_fraction, swing_fraction
@@ -257,6 +264,22 @@ class Go2BoxStep(Go2Trot):
         error = torch.sum(torch.square(self.beat_displacement - target), dim=1)
         width = self.cfg.boxstep.displacement_tracking_width
         return torch.exp(-error / width**2)
+
+    def _reward_stance_foot_placement(self):
+        """Feet scheduled as stance sit where the reference puts them under the hip.
+
+        Horizontal (x, y) error in each hip frame, from the measured joint
+        angles; exp(-err^2 / width^2), averaged over the stance feet. Run
+        Nov13_15-31-54_ left the back-right foot about 20 cm behind its hip and
+        22 cm under the body on beats 2-3.
+        """
+        joint_angles = self.dof_pos.index_select(1, self.actuated_dof_indices)
+        feet = reference.compute_foot_positions(joint_angles)
+        error = feet[..., :2] - self.reference_foot_positions[..., :2]
+        width = self.cfg.boxstep.foot_placement_width
+        score = torch.exp(-torch.sum(torch.square(error), dim=2) / width**2)
+        stance = self.scheduled_stance.float()
+        return torch.sum(score * stance, dim=1) / stance.sum(dim=1).clamp(min=1.0)
 
     def _reward_tracking_ang_vel(self):
         """Yaw rate held at zero: exp(-(omega_z / width)^2).

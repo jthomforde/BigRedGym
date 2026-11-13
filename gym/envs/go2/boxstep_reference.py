@@ -203,6 +203,38 @@ def solve_leg_joint_angles(foot_position_m):
     return joint_angles.reshape(foot_position_m.shape[0], 12)
 
 
+def compute_foot_positions(joint_angles):
+    """Return each foot's position (N, 4, 3) in its hip frame from (N, 12) angles.
+
+    Forward kinematics, MATH 3.2. The inverse of solve_leg_joint_angles.
+    """
+    hip, thigh, calf = joint_angles.reshape(-1, 4, 3).unbind(dim=2)
+    side_offset = LEG_SIDE_SIGN.to(joint_angles.device) * HIP_OFFSET_M
+    foot_x = -LINK_LENGTH_M * (torch.sin(thigh) + torch.sin(thigh + calf))
+    plane_z = -LINK_LENGTH_M * (torch.cos(thigh) + torch.cos(thigh + calf))
+    foot_y = side_offset * torch.cos(hip) - plane_z * torch.sin(hip)
+    foot_z = side_offset * torch.sin(hip) + plane_z * torch.cos(hip)
+    return torch.stack((foot_x, foot_y, foot_z), dim=2)
+
+
+def compute_reference_foot_positions(
+    time_s,
+    beat_period_s,
+    swing_time_s,
+    step_size_m,
+    standing_height_m,
+    swing_clearance_m,
+):
+    """Return the reference foot targets (N, 4, 3), each in its own hip frame."""
+    beat_index, beat_fraction = compute_beat_state(time_s, beat_period_s)
+    swing_fraction = swing_time_s / beat_period_s
+    foot_offsets = compute_foot_offsets(
+        beat_index, beat_fraction, swing_fraction, step_size_m, swing_clearance_m
+    )
+    neutral_feet = compute_neutral_foot_positions(standing_height_m, time_s.device)
+    return neutral_feet.unsqueeze(0) + foot_offsets
+
+
 def compute_reference_joint_angles(
     time_s,
     beat_period_s,
@@ -216,10 +248,12 @@ def compute_reference_joint_angles(
     time_s, beat_period_s and step_size_m are (N,) tensors; swing_time_s,
     standing_height_m and swing_clearance_m are floats.
     """
-    beat_index, beat_fraction = compute_beat_state(time_s, beat_period_s)
-    swing_fraction = swing_time_s / beat_period_s
-    foot_offsets = compute_foot_offsets(
-        beat_index, beat_fraction, swing_fraction, step_size_m, swing_clearance_m
+    foot_targets = compute_reference_foot_positions(
+        time_s,
+        beat_period_s,
+        swing_time_s,
+        step_size_m,
+        standing_height_m,
+        swing_clearance_m,
     )
-    neutral_feet = compute_neutral_foot_positions(standing_height_m, time_s.device)
-    return solve_leg_joint_angles(neutral_feet.unsqueeze(0) + foot_offsets)
+    return solve_leg_joint_angles(foot_targets)
