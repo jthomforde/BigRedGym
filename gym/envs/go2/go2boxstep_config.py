@@ -138,7 +138,9 @@ class Go2BoxStepRunnerCfg(Go2TrotRunnerCfg):
                 # (back-right foot dragged 20 cm behind in Nov13_15-31-54_).
                 stance_foot_placement = 2.0
                 stance_foot_slip = 0.5
-                extra_touchdowns = 0.5
+                # Raised from 0.5: run Nov13_18-25-51_ hopped after each step, all
+                # four feet off the ground 15 % of the time they should be down.
+                extra_touchdowns = 2.0
                 # Raised from 0.1: run Nov13_01-51-32_ overrode the reference by
                 # over 1 rad per joint and crouched with one leg tucked up.
                 correction_size = 2.0
