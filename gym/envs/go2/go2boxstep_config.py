@@ -110,7 +110,12 @@ class Go2BoxStepRunnerCfg(Go2TrotRunnerCfg):
                 action_rate = 0.25
                 action_rate2 = 0.025
                 # Pace schedule (same values as trot_support / swing_contact).
-                scheduled_support = 0.625
+                # Raised from 0.625: run Nov13_01-15-36_ kneeled on its shins with
+                # its feet down under 10% of the time.
+                scheduled_support = 2.0
+                # Calf (shin/knee) ground contact, one point per calf body
+                # touching (asset.penalize_contacts_on). Was unset, so 0.
+                collision = 1.0
                 swing_contact = 1.25
                 # New box-step terms.
                 tracking_body_velocity = 4.0  # as go2trot tracking_lin_vel
