@@ -33,6 +33,9 @@ class Go2BoxStepCfg(Go2TrotCfg):
         # Provisional: width of the exp(-(omega_z / width)^2) yaw-rate reward
         # [rad/s]. At 0.3, the 0.28 rad/s of run Nov13_02-15-31_ scores 0.42.
         yaw_rate_tracking_width = 0.3
+        # Provisional: width of the exp(-|Δx - d·p·e|^2 / width^2) per-beat
+        # displacement reward [m]. Half a 0.27 m step short scores about 0.16.
+        displacement_tracking_width = 0.10
 
     class asset(Go2TrotCfg.asset):
         # Head_upper and Head_lower are separate bodies from base on the Go2.
@@ -56,6 +59,7 @@ class Go2BoxStepCfg(Go2TrotCfg):
     class scaling(Go2TrotCfg.scaling):
         # Same scale as base_lin_vel so the critic sees both in the same units.
         reference_body_velocity = BASE_HEIGHT_REF
+        beat_displacement = 0.3  # about one step [m]
 
 
 class Go2BoxStepRunnerCfg(Go2TrotRunnerCfg):
@@ -89,6 +93,7 @@ class Go2BoxStepRunnerCfg(Go2TrotRunnerCfg):
             "box_phase_obs",
             "step_size",
             "reference_body_velocity",
+            "beat_displacement",
         ]
 
         class reward(Go2TrotRunnerCfg.critic.reward):
@@ -122,6 +127,9 @@ class Go2BoxStepRunnerCfg(Go2TrotRunnerCfg):
                 swing_contact = 1.25
                 # New box-step terms.
                 tracking_body_velocity = 4.0  # as go2trot tracking_lin_vel
+                # Body reaches each corner (run Nov13_02-32-57_ covered 19-67 %
+                # of each step). Provisional.
+                tracking_beat_displacement = 4.0
                 stance_foot_slip = 0.5
                 extra_touchdowns = 0.5
                 # Raised from 0.1: run Nov13_01-51-32_ overrode the reference by

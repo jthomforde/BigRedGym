@@ -41,6 +41,11 @@ class Go2BoxStep(Go2Trot):
         self.touchdown_count = create_column(4)
         self.previous_foot_contact = create_column(4, True, torch.bool)
         self.new_touchdown = create_column(4, False, torch.bool)
+        # Body position and heading when the current beat started (world xy),
+        # and the displacement since then in that start frame (critic only).
+        self.beat_start_position = create_column(2)
+        self.beat_start_yaw = create_column()
+        self.beat_displacement = create_column(2)
 
         neutral_feet = reference.compute_neutral_foot_positions(
             settings.standing_height_m, self.device
@@ -144,6 +149,7 @@ class Go2BoxStep(Go2Trot):
         self.touchdown_count.masked_fill_(reset_mask.unsqueeze(1), 0.0)
         self.previous_foot_contact.masked_fill_(reset_mask.unsqueeze(1), True)
         self.new_touchdown.masked_fill_(reset_mask.unsqueeze(1), False)
+        self._record_beat_start(reset_mask)
 
     def _resample_commands(self, command_mask):
         """No velocity commands in the box step: commands stay zero."""
@@ -160,6 +166,35 @@ class Go2BoxStep(Go2Trot):
         # Refresh the schedule at the new time so rewards and contacts agree.
         self._update_gait_reference()
         self._count_touchdowns()
+        self._record_beat_start(self._starts_new_beat())
+        self._update_beat_displacement()
+
+    def _starts_new_beat(self):
+        """Return (N,) bool: True on the first control step of a beat."""
+        _, beat_fraction, _ = self._compute_beat_state()
+        return beat_fraction * self.beat_period.squeeze(1) < self.dt
+
+    def _compute_base_yaw(self):
+        """Return the body's heading (N,) in rad from base_quat (x, y, z, w)."""
+        x, y, z, w = self.base_quat.unbind(dim=1)
+        return torch.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+
+    def _record_beat_start(self, mask):
+        masked_update(self.beat_start_position, self.root_states[:, :2], mask)
+        masked_update(self.beat_start_yaw, self._compute_base_yaw().unsqueeze(1), mask)
+        self.beat_displacement.masked_fill_(mask.unsqueeze(1), 0.0)
+
+    def _update_beat_displacement(self):
+        """Body displacement since the beat started, in the beat-start frame."""
+        world_shift = self.root_states[:, :2] - self.beat_start_position
+        cos_yaw = torch.cos(self.beat_start_yaw.squeeze(1))
+        sin_yaw = torch.sin(self.beat_start_yaw.squeeze(1))
+        self.beat_displacement[:, 0] = (
+            cos_yaw * world_shift[:, 0] + sin_yaw * world_shift[:, 1]
+        )
+        self.beat_displacement[:, 1] = (
+            -sin_yaw * world_shift[:, 0] + cos_yaw * world_shift[:, 1]
+        )
 
     def _detect_foot_contact(self):
         """Return (N, 4) bool: vertical foot force above the contact threshold."""
@@ -171,8 +206,7 @@ class Go2BoxStep(Go2Trot):
         self.new_touchdown[:] = foot_contact & ~self.previous_foot_contact
         _, beat_fraction, _ = self._compute_beat_state()
         # The first control step of each beat clears that beat's count.
-        starts_new_beat = beat_fraction * self.beat_period.squeeze(1) < self.dt
-        self.touchdown_count.masked_fill_(starts_new_beat.unsqueeze(1), 0.0)
+        self.touchdown_count.masked_fill_(self._starts_new_beat().unsqueeze(1), 0.0)
         self.touchdown_count.add_(self.new_touchdown.float())
         self.previous_foot_contact[:] = foot_contact
 
@@ -207,6 +241,22 @@ class Go2BoxStep(Go2Trot):
         error = self.reference_body_velocity - self.base_lin_vel[:, :2]
         width = self.cfg.boxstep.velocity_tracking_width
         return torch.exp(-torch.sum(torch.square(error), dim=1) / width**2)
+
+    def _reward_tracking_beat_displacement(self):
+        """Body has moved d * p(s) along this beat's direction since the beat began.
+
+        Position, not velocity: run Nov13_02-32-57_ covered 19-67 % of each step
+        because the velocity reward is zero-target most of the time. By the end
+        of a moving beat p = 1, so the target is the full step; on hold beats
+        the direction is zero, so the target is to stay put.
+        """
+        beat_index, beat_fraction, swing_fraction = self._compute_beat_state()
+        body_progress = reference.compute_body_progress(beat_fraction, swing_fraction)
+        direction = reference.BEAT_DIRECTIONS.to(self.device)[beat_index]
+        target = (self.step_size.squeeze(1) * body_progress).unsqueeze(1) * direction
+        error = torch.sum(torch.square(self.beat_displacement - target), dim=1)
+        width = self.cfg.boxstep.displacement_tracking_width
+        return torch.exp(-error / width**2)
 
     def _reward_tracking_ang_vel(self):
         """Yaw rate held at zero: exp(-(omega_z / width)^2).
