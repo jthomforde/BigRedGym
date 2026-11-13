@@ -120,7 +120,7 @@ def test_reference_angles_put_feet_on_the_commanded_targets():
     )
 
 
-@pytest.mark.parametrize("tempo_bpm", [89.0, 105.0, 121.0])
+@pytest.mark.parametrize("tempo_bpm", [70.0, 89.0, 105.0, 121.0])
 def test_left_and_right_pairs_never_swing_at_the_same_time(tempo_bpm):
     beat_period_s = 60.0 / tempo_bpm
     time_s, beat_period = sample_whole_box(beat_period_s)

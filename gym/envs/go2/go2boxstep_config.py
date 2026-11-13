@@ -10,7 +10,7 @@ FOOT_RADIUS_M = 0.022  # go2.urdf foot collision sphere
 
 class Go2BoxStepCfg(Go2TrotCfg):
     class env(Go2TrotCfg.env):
-        episode_length_s = 10  # about three boxes at 105 BPM
+        episode_length_s = 12  # about 2.3 boxes at 70 BPM (one box = 5.1 s)
 
     class init_state(Go2TrotCfg.init_state):
         # Robots reset in the standing pose (leg IK of the neutral feet). The hip
@@ -20,7 +20,7 @@ class Go2BoxStepCfg(Go2TrotCfg):
         reset_mode = "reset_to_basic"
 
     class boxstep:
-        tempo_bpm_range = [105.0, 105.0]  # later [89, 121]
+        tempo_bpm_range = [70.0, 70.0]  # changed from 105 BPM on 2026-11-13
         step_size_range = [0.25, 0.30]  # d [m]
         swing_time_s = 0.2  # T_sw, one leg pair's swing
         standing_height_m = STANDING_HEIGHT_M  # h
@@ -30,6 +30,9 @@ class Go2BoxStepCfg(Go2TrotCfg):
         # peak speed is about 1 m/s at d = 0.25 m, so 0.3 m/s is tighter than
         # go2trot's tracking_sigma = 0.25 (an effective width of 0.5 m/s).
         velocity_tracking_width = 0.3
+        # Provisional: width of the exp(-(omega_z / width)^2) yaw-rate reward
+        # [rad/s]. At 0.3, the 0.28 rad/s of run Nov13_02-15-31_ scores 0.42.
+        yaw_rate_tracking_width = 0.3
 
     class asset(Go2TrotCfg.asset):
         # Head_upper and Head_lower are separate bodies from base on the Go2.

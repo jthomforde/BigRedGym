@@ -208,6 +208,16 @@ class Go2BoxStep(Go2Trot):
         width = self.cfg.boxstep.velocity_tracking_width
         return torch.exp(-torch.sum(torch.square(error), dim=1) / width**2)
 
+    def _reward_tracking_ang_vel(self):
+        """Yaw rate held at zero: exp(-(omega_z / width)^2).
+
+        Overrides Go2Trot's version, which squares the error twice, so turning
+        at 0.28 rad/s cost 0.06 % of the reward; run Nov13_02-15-31_ drifted
+        5-44 deg clockwise over two boxes.
+        """
+        width = self.cfg.boxstep.yaw_rate_tracking_width
+        return torch.exp(-torch.square(self.base_ang_vel[:, 2] / width))
+
     def _reward_stance_foot_slip(self):
         """Penalize horizontal speed of planted feet (scheduled stance, in contact)."""
         planted = self.scheduled_stance & self._detect_foot_contact()
