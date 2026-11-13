@@ -189,9 +189,13 @@ class Go2BoxStep(Go2Trot):
     # ------------------------------------------------------
 
     def _reward_scheduled_support(self):
-        """Fraction of the feet scheduled as stance that are in contact."""
-        supporting = self.scheduled_stance & self._detect_foot_contact()
-        return supporting.sum(dim=1) / self.scheduled_stance.sum(dim=1).clamp(min=1)
+        """1 when every foot scheduled as stance is in contact, else 0.
+
+        All-or-nothing: run Nov13_01-51-32_ held one leg up because the earlier
+        fraction-of-feet version still paid 0.75 on three feet.
+        """
+        missing = self.scheduled_stance & ~self._detect_foot_contact()
+        return (~missing.any(dim=1)).float()
 
     def _reward_swing_contact(self):
         """Penalize load carried by feet scheduled as swing."""

@@ -121,7 +121,9 @@ class Go2BoxStepRunnerCfg(Go2TrotRunnerCfg):
                 tracking_body_velocity = 4.0  # as go2trot tracking_lin_vel
                 stance_foot_slip = 0.5
                 extra_touchdowns = 0.5
-                correction_size = 0.1
+                # Raised from 0.1: run Nov13_01-51-32_ overrode the reference by
+                # over 1 rad per joint and crouched with one leg tucked up.
+                correction_size = 2.0
 
     class runner(Go2TrotRunnerCfg.runner):
         experiment_name = "go2boxstep"
